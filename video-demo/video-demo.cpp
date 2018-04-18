@@ -34,6 +34,7 @@ int main(int argsc, char ** argsv)
                                                             {boost::filesystem::path(".mp4"), 1} };
     affdex::path DATA_FOLDER;
     affdex::path videoPath;
+    affdex::path outputPath;
 
     int process_framerate = 30;
     bool draw_display = true;
@@ -52,9 +53,11 @@ int main(int argsc, char ** argsv)
 #ifdef _WIN32
     ("data,d", po::wvalue< affdex::path >(&DATA_FOLDER)->default_value(affdex::path(L"data"), std::string("data")), "Path to the data folder")
     ("input,i", po::wvalue< affdex::path >(&videoPath)->required(), "Video file to processs")
+    ("output,o", po::wvalue< affdex::path >(&outputPath)->default_value(affdex::path(), std::string("input")), "Output folder (location where the csv file containing the analysed data is stored), defaults to the same folder as the video file")
 #else // _WIN32
     ("data,d", po::value< affdex::path >(&DATA_FOLDER)->default_value(affdex::path("data"), std::string("data")), "Path to the data folder")
     ("input,i", po::value< affdex::path >(&videoPath)->required(), "Video file to processs")
+    ("output,o", po::value< affdex::path >(&outputPath)->default_value(affdex::path(), std::string("input")), "Output folder (location where the csv file containing the analysed data is stored), defaults to the same folder as the video file")
 #endif // _WIN32
     ("pfps", po::value< int >(&process_framerate)->default_value(30), "Processing framerate.")
     ("draw", po::value< bool >(&draw_display)->default_value(true), "Draw video on screen.")
@@ -92,11 +95,29 @@ int main(int argsc, char ** argsv)
     {
         std::shared_ptr<Detector> detector;
 
+        if (outputPath.empty()) // Default case, just use the video file
+        {
+            outputPath = videoPath;
+        }
+
+        boost::filesystem::path videoPathObject(videoPath);
+
         //Initialize out file
-        boost::filesystem::path csvPath(videoPath);
-        boost::filesystem::path fileExt = csvPath.extension();
+        boost::filesystem::path csvPath(outputPath);
+        if (!boost::filesystem::exists(csvPath))
+        {
+            // The user might supply an output dir which does not exist yet. In this case, create it
+            boost::filesystem::create_directories(csvPath);
+        }
+        if (boost::filesystem::is_directory(csvPath))
+        {
+            // Use the filename of the video file
+            csvPath /= videoPathObject.filename();
+        }
+
         csvPath.replace_extension(".csv");
         std::ofstream csvFileStream(csvPath.c_str());
+        boost::filesystem::path fileExt = videoPathObject.extension();
 
         if (!csvFileStream.is_open())
         {
